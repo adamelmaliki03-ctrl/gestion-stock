@@ -3,4 +3,5 @@ pandas
 openpyxl
 fpdf
 pillow
-pyzbar
+opencv-python-headless
+numpy
