@@ -20,7 +20,7 @@ except ImportError:
 # CONFIGURATION
 # ─────────────────────────────────────────────
 
-st.set_page_config(page_title="GMAO Stock - Campus EMI", layout="wide")
+st.set_page_config(page_title="GMAO Stock - Campus UIR", layout="wide")
 
 EXCEL_PATH = "stock_campus_emi.xlsx"
 
