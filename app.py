@@ -213,6 +213,10 @@ def page_accueil():
         st.markdown("<br><br>", unsafe_allow_html=True)
         st.markdown("## 🛠️ GMAO Stock - Campus EMI")
         st.markdown("---")
+        # Message de confirmation après sortie
+        if st.session_state.get("last_sortie_msg"):
+            st.success(st.session_state.last_sortie_msg)
+            st.session_state.last_sortie_msg = ""
 
         # ── Bouton Technicien (accès direct) ──
         st.markdown("### 🟢 Technicien")
@@ -568,7 +572,11 @@ def page_app():
                         id_val, designation, qte_sortie, user_name
                     )
                     st.session_state.scanned_id = ""
+                    st.session_state.guest_mode = False
+                    st.session_state.role = None
+                    st.session_state.nom_user = None
                     st.session_state["last_sortie_msg"] = f"✅ Sortie validée : {qte_sortie} × {designation} retiré(s) par {user_name}."
+                    st.rerun()
                 else:
                     st.error(f"❌ Stock insuffisant ! Stock actuel : {stock_actuel}")
             else:
