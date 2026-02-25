@@ -8,9 +8,10 @@ from openpyxl.utils import get_column_letter
 import io
 import os
 import hashlib
+import numpy as np
 from PIL import Image
 try:
-    from pyzbar.pyzbar import decode as decode_qr
+    import zxingcpp
     QR_DECODE_AVAILABLE = True
 except ImportError:
     QR_DECODE_AVAILABLE = False
@@ -489,16 +490,17 @@ def page_app():
 
         if img_file is not None:
             if QR_DECODE_AVAILABLE:
-                img = Image.open(img_file)
-                codes = decode_qr(img)
-                if codes:
-                    decoded = codes[0].data.decode("utf-8").strip()
+                img = Image.open(img_file).convert("RGB")
+                img_np = np.array(img)
+                results = zxingcpp.read_barcodes(img_np)
+                if results:
+                    decoded = results[0].text.strip()
                     st.session_state.scanned_id = decoded
                     st.success(f"✅ QR Code détecté : **{decoded}**")
                 else:
                     st.warning("⚠️ QR Code non lisible. Rapprochez la caméra ou saisissez l'ID manuellement.")
             else:
-                st.info("ℹ️ Décodage automatique non disponible. Ajoutez  au requirements.txt.")
+                st.warning("⚠️ Décodage non disponible. Saisissez l'ID manuellement.")
 
         # ── Champ ID : pré-rempli si QR scanné ──
         id_scan = st.text_input(
