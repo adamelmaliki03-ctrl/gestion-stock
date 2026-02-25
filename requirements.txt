@@ -3,5 +3,5 @@ pandas
 openpyxl
 fpdf
 pillow
-opencv-python-headless
+zxing-cpp
 numpy
