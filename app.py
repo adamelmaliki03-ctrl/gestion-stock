@@ -22,7 +22,7 @@ except ImportError:
 
 st.set_page_config(page_title="GMAO Stock - Campus UIR", layout="wide")
 
-EXCEL_PATH = "stock_campus_emi.xlsx"
+EXCEL_PATH = "stock_campus_UIR.xlsx"
 
 # ⚠️ Changer ces identifiants selon vos besoins
 USERS = {
