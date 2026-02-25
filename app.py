@@ -54,8 +54,9 @@ MENUS_TECH = ["📤 Sortie de Pièce (Scan)"]
 # ─────────────────────────────────────────────
 
 def load_stock_from_excel():
-    df = pd.read_excel(EXCEL_PATH, sheet_name="Stock", engine="openpyxl")
-    df = df[df["ID_QR"].notna() & (df["ID_QR"] != "TOTAL")]
+    df = pd.read_excel(EXCEL_PATH, sheet_name="Stock", engine="openpyxl", dtype={"ID_QR": str})
+    df["ID_QR"] = df["ID_QR"].astype(str).str.strip().str.rstrip(".0")
+    df = df[df["ID_QR"].notna() & (df["ID_QR"] != "TOTAL") & (df["ID_QR"] != "nan")]
     if "Seuil_Alerte" not in df.columns:
         df["Seuil_Alerte"] = 0
     return df[["ID_QR", "Designation", "Quantite", "Prix_Unitaire_DH", "Seuil_Alerte"]].copy()
@@ -494,7 +495,7 @@ def page_app():
                 img_np = np.array(img)
                 results = zxingcpp.read_barcodes(img_np)
                 if results:
-                    decoded = results[0].text.strip()
+                    decoded = results[0].text.strip().replace(" ", "")
                     st.session_state.scanned_id = decoded
                     st.success(f"✅ QR Code détecté : **{decoded}**")
                 else:
@@ -508,17 +509,20 @@ def page_app():
             value=st.session_state.scanned_id,
             placeholder="Ex: PMP-01"
         )
-        # Synchronise si l'utilisateur modifie manuellement
+        # Nettoyage et synchronisation
+        id_scan = id_scan.strip().replace(" ", "")
         st.session_state.scanned_id = id_scan
 
         # Aperçu de la pièce si l'ID est reconnu
         df = st.session_state.stock_df
-        if id_scan and id_scan in df["ID_QR"].values:
-            idx = df[df["ID_QR"] == id_scan].index[0]
+        # Normalisation des IDs du stock pour comparaison robuste
+        df_ids = df["ID_QR"].astype(str).str.strip()
+        if id_scan and id_scan in df_ids.values:
+            idx = df[df_ids == id_scan].index[0]
             nom = df.at[idx, "Designation"]
             st.info(f"🔩 **{nom}**")
         elif id_scan:
-            st.error("❌ Pièce non trouvée dans la base de données.")
+            st.error(f"❌ Pièce '{id_scan}' non trouvée dans la base de données.")
 
         qte_sortie = st.number_input("Quantité à retirer", min_value=1, value=1)
 
@@ -529,8 +533,8 @@ def page_app():
         if st.button("✅ Valider la Sortie", type="primary"):
             if not id_scan:
                 st.warning("⚠️ Veuillez scanner ou saisir un ID.")
-            elif id_scan in df["ID_QR"].values:
-                idx = df[df["ID_QR"] == id_scan].index[0]
+            elif id_scan in df_ids.values:
+                idx = df[df_ids == id_scan].index[0]
                 if df.at[idx, "Quantite"] >= qte_sortie:
                     st.session_state.stock_df.at[idx, "Quantite"] -= qte_sortie
                     designation = df.at[idx, "Designation"]
