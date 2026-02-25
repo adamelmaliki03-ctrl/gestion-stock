@@ -63,34 +63,45 @@ def load_stock_from_excel():
 
 
 def save_stock_to_excel(df: pd.DataFrame):
-    wb = load_workbook(EXCEL_PATH)
-    ws = wb["Stock"]
-    border = Border(left=Side(style="thin"), right=Side(style="thin"),
-                    top=Side(style="thin"), bottom=Side(style="thin"))
-    alt_fill = PatternFill("solid", start_color="EAF0FB")
-    for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
-        for cell in row:
-            cell.value = None
-    for r_idx, row in enumerate(df.itertuples(index=False), start=2):
-        values = [row.ID_QR, row.Designation, row.Quantite, row.Prix_Unitaire_DH,
-                  f"=C{r_idx}*D{r_idx}", row.Seuil_Alerte]
-        for c_idx, val in enumerate(values, 1):
-            cell = ws.cell(r_idx, c_idx, val)
-            cell.border = border
-            cell.font = Font(name="Arial", size=10)
-            cell.alignment = Alignment(horizontal="center" if c_idx != 2 else "left")
-            if r_idx % 2 == 0:
-                cell.fill = alt_fill
-    total_row = len(df) + 2
-    ws.cell(total_row, 1, "TOTAL").font = Font(bold=True, name="Arial")
-    ws.cell(total_row, 1).border = border
-    total_cell = ws.cell(total_row, 5, f"=SUM(E2:E{total_row-1})")
-    total_cell.font = Font(bold=True, name="Arial", color="2E4057")
-    total_cell.border = border
-    total_cell.alignment = Alignment(horizontal="center")
-    for c in [2, 3, 4, 6]:
-        ws.cell(total_row, c).border = border
-    wb.save(EXCEL_PATH)
+    try:
+        wb = load_workbook(EXCEL_PATH)
+        ws = wb["Stock"]
+        border = Border(left=Side(style="thin"), right=Side(style="thin"),
+                        top=Side(style="thin"), bottom=Side(style="thin"))
+        alt_fill = PatternFill("solid", start_color="EAF0FB")
+
+        # Effacer les anciennes données
+        for row in ws.iter_rows(min_row=2, max_row=ws.max_row):
+            for cell in row:
+                cell.value = None
+
+        # Réécrire ligne par ligne (colonnes essentielles uniquement)
+        for r_idx, row in enumerate(df.itertuples(index=False), start=2):
+            seuil = getattr(row, "Seuil_Alerte", 0) or 0
+            values = [str(row.ID_QR), row.Designation, int(row.Quantite),
+                      float(row.Prix_Unitaire_DH), f"=C{r_idx}*D{r_idx}", seuil]
+            for c_idx, val in enumerate(values, 1):
+                cell = ws.cell(r_idx, c_idx, val)
+                cell.border = border
+                cell.font = Font(name="Arial", size=10)
+                cell.alignment = Alignment(horizontal="center" if c_idx != 2 else "left")
+                if r_idx % 2 == 0:
+                    cell.fill = alt_fill
+
+        # Ligne TOTAL
+        total_row = len(df) + 2
+        ws.cell(total_row, 1, "TOTAL").font = Font(bold=True, name="Arial")
+        ws.cell(total_row, 1).border = border
+        total_cell = ws.cell(total_row, 5, f"=SUM(E2:E{total_row-1})")
+        total_cell.font = Font(bold=True, name="Arial", color="2E4057")
+        total_cell.border = border
+        total_cell.alignment = Alignment(horizontal="center")
+        for c in [2, 3, 4, 6]:
+            ws.cell(total_row, c).border = border
+
+        wb.save(EXCEL_PATH)
+    except Exception as e:
+        st.error(f"❌ Erreur sauvegarde Excel : {e}")
 
 
 def ensure_historique_sheet():
@@ -300,25 +311,20 @@ def page_app():
     # ── TITRE ──
     st.title("🛠️ Gestion de Stock & Maintenance - Campus EMI")
 
-    # ── GARDE : pas de fichier Excel (admin) ──
-    if role == "admin" and st.session_state.stock_df is None:
+    # ── GARDE : chargement initial du stock (une seule fois) ──
+    if st.session_state.stock_df is None:
         if os.path.exists(EXCEL_PATH):
             st.session_state.stock_df = load_stock_from_excel()
-        else:
+        elif role == "admin":
             st.info("👈 **Chargez votre fichier Excel** via la barre latérale pour commencer.")
             st.markdown("""
 **Colonnes requises dans la feuille `Stock` :**
 
 | ID_QR | Designation | Quantite | Prix_Unitaire_DH | Seuil_Alerte *(optionnel)* |
 |---|---|---|---|---|
-| PMP-01 | Circulateur Solaire | 2 | 1500 | 3 |
+| 222 | Nom de la pièce | 10 | 500 | 3 |
             """)
             st.stop()
-
-    # ── GARDE : technicien sans stock ──
-    if role == "technicien" and st.session_state.stock_df is None:
-        if os.path.exists(EXCEL_PATH):
-            st.session_state.stock_df = load_stock_from_excel()
         else:
             st.warning("⚠️ Aucun stock disponible. Contactez l'administrateur.")
             st.stop()
@@ -531,25 +537,34 @@ def page_app():
         user_name = st.text_input("Nom du technicien", value=default_name)
 
         if st.button("✅ Valider la Sortie", type="primary"):
-            if not id_scan:
+            # Relire le stock frais depuis la session au moment du clic
+            df_live = st.session_state.stock_df.copy()
+            df_live_ids = df_live["ID_QR"].astype(str).str.strip()
+            id_val = st.session_state.scanned_id.strip()
+
+            if not id_val:
                 st.warning("⚠️ Veuillez scanner ou saisir un ID.")
-            elif id_scan in df_ids.values:
-                idx = df[df_ids == id_scan].index[0]
-                if df.at[idx, "Quantite"] >= qte_sortie:
-                    st.session_state.stock_df.at[idx, "Quantite"] -= qte_sortie
-                    designation = df.at[idx, "Designation"]
+            elif id_val in df_live_ids.values:
+                idx = df_live[df_live_ids == id_val].index[0]
+                stock_actuel = int(df_live.at[idx, "Quantite"])
+                designation  = df_live.at[idx, "Designation"]
+                if stock_actuel >= qte_sortie:
+                    # Mise à jour directe sur st.session_state.stock_df
+                    st.session_state.stock_df.at[idx, "Quantite"] = stock_actuel - qte_sortie
+                    # Sauvegarde Excel
                     save_stock_to_excel(st.session_state.stock_df)
+                    # Historique
                     append_sortie_to_excel(
                         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        id_scan, designation, qte_sortie, user_name
+                        id_val, designation, qte_sortie, user_name
                     )
                     st.success(f"✅ Sortie validée : {qte_sortie} × **{designation}** retiré(s) par {user_name}.")
-                    st.session_state.scanned_id = ""   # Réinitialise pour le prochain scan
+                    st.session_state.scanned_id = ""
                     st.rerun()
                 else:
-                    st.error("❌ Stock insuffisant !")
+                    st.error(f"❌ Stock insuffisant ! Stock actuel : {stock_actuel}")
             else:
-                st.warning("⚠️ Pièce non trouvée dans la base de données.")
+                st.warning(f"⚠️ Pièce '{id_val}' non trouvée dans la base de données.")
 
 
 # ─────────────────────────────────────────────
