@@ -57,8 +57,13 @@ def load_stock_from_excel():
     df = pd.read_excel(EXCEL_PATH, sheet_name="Stock", engine="openpyxl", dtype={"ID_QR": str})
     df["ID_QR"] = df["ID_QR"].astype(str).str.strip().str.rstrip(".0")
     df = df[df["ID_QR"].notna() & (df["ID_QR"] != "TOTAL") & (df["ID_QR"] != "nan")]
-    if "Seuil_Alerte" not in df.columns:
-        df["Seuil_Alerte"] = 0
+    # Remplir les None par des valeurs par défaut
+    if "Quantite" not in df.columns:        df["Quantite"] = 0
+    if "Prix_Unitaire_DH" not in df.columns: df["Prix_Unitaire_DH"] = 0
+    if "Seuil_Alerte" not in df.columns:    df["Seuil_Alerte"] = 0
+    df["Quantite"]        = pd.to_numeric(df["Quantite"], errors="coerce").fillna(0).astype(int)
+    df["Prix_Unitaire_DH"] = pd.to_numeric(df["Prix_Unitaire_DH"], errors="coerce").fillna(0).astype(float)
+    df["Seuil_Alerte"]    = pd.to_numeric(df["Seuil_Alerte"], errors="coerce").fillna(0).astype(int)
     return df[["ID_QR", "Designation", "Quantite", "Prix_Unitaire_DH", "Seuil_Alerte"]].copy()
 
 
@@ -536,6 +541,10 @@ def page_app():
         default_name = st.session_state.nom_user or ""
         user_name = st.text_input("Nom du technicien", value=default_name)
 
+        if "last_sortie_msg" in st.session_state and st.session_state.last_sortie_msg:
+            st.success(st.session_state.last_sortie_msg)
+            st.session_state.last_sortie_msg = ""
+
         if st.button("✅ Valider la Sortie", type="primary"):
             # Relire le stock frais depuis la session au moment du clic
             df_live = st.session_state.stock_df.copy()
@@ -558,9 +567,8 @@ def page_app():
                         datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
                         id_val, designation, qte_sortie, user_name
                     )
-                    st.success(f"✅ Sortie validée : {qte_sortie} × **{designation}** retiré(s) par {user_name}.")
                     st.session_state.scanned_id = ""
-                    st.rerun()
+                    st.session_state["last_sortie_msg"] = f"✅ Sortie validée : {qte_sortie} × {designation} retiré(s) par {user_name}."
                 else:
                     st.error(f"❌ Stock insuffisant ! Stock actuel : {stock_actuel}")
             else:
