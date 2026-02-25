@@ -153,6 +153,60 @@ def generate_pdf(id_trans, fournisseur, items_list, total_general) -> bytes:
 
 st.title("🛠️ Gestion de Stock & Maintenance - Campus EMI")
 st.sidebar.header("Navigation")
+
+# ── Upload du fichier Excel ──
+st.sidebar.markdown("### 📂 Charger un fichier Excel")
+uploaded_file = st.sidebar.file_uploader(
+    "Déposer votre fichier .xlsx",
+    type=["xlsx"],
+    help="Le fichier doit contenir une feuille 'Stock' avec les colonnes : ID_QR, Designation, Quantite, Prix_Unitaire_DH"
+)
+
+if uploaded_file is not None:
+    # Sauvegarde du fichier uploadé sur le disque
+    with open(EXCEL_PATH, "wb") as f:
+        f.write(uploaded_file.read())
+    # Détection des colonnes disponibles
+    df_check = pd.read_excel(EXCEL_PATH, sheet_name=None, engine="openpyxl")
+    sheet_names = list(df_check.keys())
+
+    # Création de la feuille Historique_Sorties si absente
+    if "Historique_Sorties" not in sheet_names:
+        from openpyxl import load_workbook
+        from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+        wb = load_workbook(EXCEL_PATH)
+        ws2 = wb.create_sheet("Historique_Sorties")
+        header_fill = PatternFill("solid", start_color="2E4057")
+        header_font = Font(bold=True, color="FFFFFF", name="Arial", size=11)
+        border = Border(left=Side(style="thin"), right=Side(style="thin"),
+                        top=Side(style="thin"), bottom=Side(style="thin"))
+        hist_headers = ["Date", "ID_QR", "Designation", "Quantite_Sortie", "Technicien"]
+        hist_widths  = [22, 12, 35, 18, 25]
+        for col, (h, w) in enumerate(zip(hist_headers, hist_widths), 1):
+            from openpyxl.utils import get_column_letter
+            cell = ws2.cell(row=1, column=col, value=h)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center")
+            cell.border = border
+            ws2.column_dimensions[get_column_letter(col)].width = w
+        wb.save(EXCEL_PATH)
+
+    # Vérification des colonnes obligatoires
+    df_stock_check = df_check.get("Stock", pd.DataFrame())
+    required_cols = {"ID_QR", "Designation", "Quantite", "Prix_Unitaire_DH"}
+    missing = required_cols - set(df_stock_check.columns)
+    if missing:
+        st.sidebar.error(f"❌ Colonnes manquantes dans la feuille 'Stock' : {', '.join(missing)}")
+    else:
+        st.session_state.stock_df = load_stock_from_excel()
+        st.sidebar.success(f"✅ Fichier chargé : {uploaded_file.name}")
+        if "Seuil_Alerte" not in df_stock_check.columns:
+            st.session_state.stock_df["Seuil_Alerte"] = 0
+            st.sidebar.info("ℹ️ Colonne 'Seuil_Alerte' absente — alertes désactivées.")
+
+st.sidebar.markdown("---")
+
 menu = st.sidebar.radio(
     "Choisir une action",
     ["📦 État du Stock", "📤 Sortie de Pièce (Scan)", "📥 Entrée & Facturation", "📋 Historique Hebdo"]
@@ -301,3 +355,4 @@ elif menu == "📋 Historique Hebdo":
                 file_name=f"rapport_sorties_hebdo_{datetime.now().strftime('%Y%m%d')}.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
+
