@@ -8,6 +8,12 @@ from openpyxl.utils import get_column_letter
 import io
 import os
 import hashlib
+from PIL import Image
+try:
+    from pyzbar.pyzbar import decode as decode_qr
+    QR_DECODE_AVAILABLE = True
+except ImportError:
+    QR_DECODE_AVAILABLE = False
 
 # ─────────────────────────────────────────────
 # CONFIGURATION
@@ -473,8 +479,45 @@ def page_app():
     # ════════════════════════════════════════
     elif menu == "📤 Sortie de Pièce (Scan)":
         st.subheader("Sortie de matériel par Scan QR")
-        st.camera_input("Scanner le QR Code sur la pièce")
-        id_scan    = st.text_input("Ou saisir l'ID manuellement (ex: PMP-01)")
+
+        # ── Initialisation de l'ID scanné en session ──
+        if "scanned_id" not in st.session_state:
+            st.session_state.scanned_id = ""
+
+        # ── Caméra + décodage automatique du QR ──
+        img_file = st.camera_input("📷 Scanner le QR Code sur la pièce")
+
+        if img_file is not None:
+            if QR_DECODE_AVAILABLE:
+                img = Image.open(img_file)
+                codes = decode_qr(img)
+                if codes:
+                    decoded = codes[0].data.decode("utf-8").strip()
+                    st.session_state.scanned_id = decoded
+                    st.success(f"✅ QR Code détecté : **{decoded}**")
+                else:
+                    st.warning("⚠️ QR Code non lisible. Rapprochez la caméra ou saisissez l'ID manuellement.")
+            else:
+                st.info("ℹ️ Décodage automatique non disponible. Ajoutez  au requirements.txt.")
+
+        # ── Champ ID : pré-rempli si QR scanné ──
+        id_scan = st.text_input(
+            "🔢 ID de la pièce",
+            value=st.session_state.scanned_id,
+            placeholder="Ex: PMP-01"
+        )
+        # Synchronise si l'utilisateur modifie manuellement
+        st.session_state.scanned_id = id_scan
+
+        # Aperçu de la pièce si l'ID est reconnu
+        df = st.session_state.stock_df
+        if id_scan and id_scan in df["ID_QR"].values:
+            idx = df[df["ID_QR"] == id_scan].index[0]
+            nom = df.at[idx, "Designation"]
+            st.info(f"🔩 **{nom}**")
+        elif id_scan:
+            st.error("❌ Pièce non trouvée dans la base de données.")
+
         qte_sortie = st.number_input("Quantité à retirer", min_value=1, value=1)
 
         # Nom du technicien : pré-rempli si connecté
@@ -482,8 +525,9 @@ def page_app():
         user_name = st.text_input("Nom du technicien", value=default_name)
 
         if st.button("✅ Valider la Sortie", type="primary"):
-            df = st.session_state.stock_df
-            if id_scan in df["ID_QR"].values:
+            if not id_scan:
+                st.warning("⚠️ Veuillez scanner ou saisir un ID.")
+            elif id_scan in df["ID_QR"].values:
                 idx = df[df["ID_QR"] == id_scan].index[0]
                 if df.at[idx, "Quantite"] >= qte_sortie:
                     st.session_state.stock_df.at[idx, "Quantite"] -= qte_sortie
@@ -494,6 +538,8 @@ def page_app():
                         id_scan, designation, qte_sortie, user_name
                     )
                     st.success(f"✅ Sortie validée : {qte_sortie} × **{designation}** retiré(s) par {user_name}.")
+                    st.session_state.scanned_id = ""   # Réinitialise pour le prochain scan
+                    st.rerun()
                 else:
                     st.error("❌ Stock insuffisant !")
             else:
@@ -508,4 +554,3 @@ if not st.session_state.logged_in and not st.session_state.guest_mode:
     page_accueil()
 else:
     page_app()
-
