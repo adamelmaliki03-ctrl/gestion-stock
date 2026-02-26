@@ -22,7 +22,7 @@ except ImportError:
 
 st.set_page_config(page_title="GMAO Stock - Campus UIR", layout="wide")
 
-EXCEL_PATH = "stock_campus_UIR.xlsx"
+EXCEL_PATH = "stock_campus_emi.xlsx"
 
 # ⚠️ Changer ces identifiants selon vos besoins
 USERS = {
@@ -164,7 +164,7 @@ def generate_pdf(id_trans, fournisseur, items_list, total_general) -> bytes:
     pdf.set_font("Arial", size=12)
     pdf.cell(200, 10, f"Référence : {id_trans} | Date : {datetime.now().strftime('%d/%m/%Y')}", ln=True, align="C")
     pdf.ln(10)
-    pdf.cell(100, 10, "Organisme : Campus Universitaire / EMI", ln=True)
+    pdf.cell(100, 10, "Organisme : Campus Universitaire / UIR", ln=True)
     pdf.cell(100, 10, f"Fournisseur : {fournisseur}", ln=True)
     pdf.ln(10)
     pdf.set_fill_color(200, 220, 255)
@@ -211,7 +211,7 @@ def page_accueil():
     col_c, col_m, col_c2 = st.columns([1, 2, 1])
     with col_m:
         st.markdown("<br><br>", unsafe_allow_html=True)
-        st.markdown("## 🛠️ GMAO Stock - Campus EMI")
+        st.markdown("## 🛠️ GMAO Stock - Campus UIR")
         st.markdown("---")
         # Message de confirmation après sortie
         if st.session_state.get("last_sortie_msg"):
@@ -253,7 +253,7 @@ def page_accueil():
                 st.error("❌ Identifiant inconnu ou non autorisé.")
 
         st.markdown("---")
-        st.caption("Projet PFE - EMI Génie Mécanique | Maintenance 4.0")
+        st.caption("Projet PFE - UIR Génie Mécanique | Maintenance 4.0")
 
 
 # ─────────────────────────────────────────────
@@ -294,6 +294,7 @@ def page_app():
             if os.path.exists(EXCEL_PATH):
                 st.session_state.stock_df = load_stock_from_excel()
                 st.sidebar.success("Rechargé !")
+                st.rerun()
         st.sidebar.markdown("---")
 
     # Menu selon rôle
@@ -315,10 +316,10 @@ def page_app():
             st.rerun()
 
     st.sidebar.markdown("---")
-    st.sidebar.info("Projet PFE - EMI Génie Mécanique\nMaintenance 4.0")
+    st.sidebar.info("Projet PFE - UIR Génie Mécanique\nMaintenance 4.0")
 
     # ── TITRE ──
-    st.title("🛠️ Gestion de Stock & Maintenance - Campus EMI")
+    st.title("🛠️ Gestion de Stock & Maintenance - Campus UIR")
 
     # ── GARDE : chargement initial du stock (une seule fois) ──
     if st.session_state.stock_df is None:
@@ -343,6 +344,11 @@ def page_app():
     # ════════════════════════════════════════
     if menu == "📦 État du Stock":
         st.subheader("Inventaire des pièces de rechange")
+
+        if st.button("🔄 Rafraîchir le stock", type="primary"):
+            st.session_state.stock_df = load_stock_from_excel()
+            st.rerun()
+
         col1, col2 = st.columns([3, 1])
         with col1:
             df_display = st.session_state.stock_df.copy()
@@ -541,9 +547,25 @@ def page_app():
 
         qte_sortie = st.number_input("Quantité à retirer", min_value=1, value=1)
 
-        # Nom du technicien : pré-rempli si connecté
-        default_name = st.session_state.nom_user or ""
-        user_name = st.text_input("Nom du technicien", value=default_name)
+        # Nom du technicien : liste déroulante
+        techniciens = [
+            "HEDDIOUI HANANE",
+            "BELALLAM EL MEHDI",
+            "TAAMY TAYEB",
+            "ELBAJJAR ANDERAHIM",
+            "EL BAGARI JOUAD",
+            "MALKI RABIE",
+            "LGHZAL ABDELLAH",
+            "BELYAMANE YOUSSEF",
+            "ELHABCHI HOUSSINE",
+            "LAHBI TEHAMI",
+            "MOUHAH AZIZ",
+            "CHERKAOUI ALAA-EDDIN",
+            "LAHMAIRI AYOUB",
+            "OULAD LAMKASSE NOUR EDDINE",
+            "EL JLAYDI AYOUB",
+        ]
+        user_name = st.selectbox("👷 Nom du technicien", techniciens)
 
         if "last_sortie_msg" in st.session_state and st.session_state.last_sortie_msg:
             st.success(st.session_state.last_sortie_msg)
@@ -587,6 +609,10 @@ def page_app():
 # ROUTAGE PRINCIPAL
 # ─────────────────────────────────────────────
 
+if not st.session_state.logged_in and not st.session_state.guest_mode:
+    page_accueil()
+else:
+    page_app()
 if not st.session_state.logged_in and not st.session_state.guest_mode:
     page_accueil()
 else:
