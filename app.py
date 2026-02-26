@@ -221,7 +221,7 @@ def page_accueil():
         # ── Bouton Technicien (accès direct) ──
         st.markdown("### 🟢 Technicien")
         st.markdown("Accès direct à la sortie de pièces, sans mot de passe.")
-        if st.button("📤 Accéder à la Sortie de Pièce", use_container_width=True):
+        if st.button("📤 Accéder à la Sortie de Pièce", use_container_width=True, key="btn_sortie_accueil"):
             st.session_state.guest_mode = True
             st.session_state.role = "technicien"
             st.session_state.nom_user = "Technicien"
@@ -237,7 +237,7 @@ def page_accueil():
         username = st.text_input("👤 Identifiant", placeholder="Identifiant admin")
         password = st.text_input("🔑 Mot de passe", type="password", placeholder="Mot de passe")
 
-        if st.button("Se connecter", use_container_width=True, type="primary"):
+        if st.button("Se connecter", use_container_width=True, type="primary", key="btn_login"):
             if username in USERS and USERS[username]["role"] == "admin":
                 hashed = hashlib.sha256(password.encode()).hexdigest()
                 if hashed == USERS[username]["password"]:
@@ -290,7 +290,7 @@ def page_app():
                     st.session_state.stock_df = load_stock_from_excel()
                     st.sidebar.success(f"✅ Fichier chargé : {uploaded_file.name}")
 
-        if st.sidebar.button("🔄 Recharger depuis Excel"):
+        if st.sidebar.button("🔄 Recharger depuis Excel", key="btn_sidebar_reload"):
             if os.path.exists(EXCEL_PATH):
                 st.session_state.stock_df = load_stock_from_excel()
                 st.sidebar.success("Rechargé !")
@@ -304,13 +304,13 @@ def page_app():
     st.sidebar.markdown("---")
     # Bouton selon le mode
     if st.session_state.guest_mode:
-        if st.sidebar.button("🏠 Retour à l'accueil"):
+        if st.sidebar.button("🏠 Retour à l'accueil", key="btn_retour_accueil"):
             st.session_state.guest_mode = False
             st.session_state.role = None
             st.session_state.nom_user = None
             st.rerun()
     else:
-        if st.sidebar.button("🚪 Se déconnecter"):
+        if st.sidebar.button("🚪 Se déconnecter", key="btn_deconnecter"):
             for key in ["logged_in", "guest_mode", "role", "username", "nom_user"]:
                 st.session_state[key] = False if key in ["logged_in", "guest_mode"] else None
             st.rerun()
@@ -345,7 +345,7 @@ def page_app():
     if menu == "📦 État du Stock":
         st.subheader("Inventaire des pièces de rechange")
 
-        if st.button("🔄 Rafraîchir le stock", type="primary"):
+        if st.button("🔄 Rafraîchir le stock", type="primary", key="btn_refresh_stock"):
             st.session_state.stock_df = load_stock_from_excel()
             st.rerun()
 
@@ -436,7 +436,7 @@ def page_app():
             df = st.session_state.stock_df
             id_del = st.selectbox("Sélectionner la pièce à supprimer", df["ID_QR"], key="del_id")
             st.warning(f"⚠️ Vous allez supprimer définitivement **{id_del}** du stock.")
-            if st.button("🗑️ Confirmer la suppression", type="primary"):
+            if st.button("🗑️ Confirmer la suppression", type="primary", key="btn_supprimer"):
                 st.session_state.stock_df = df[df["ID_QR"] != id_del].reset_index(drop=True)
                 save_stock_to_excel(st.session_state.stock_df)
                 st.success(f"✅ Pièce **{id_del}** supprimée et Excel mis à jour.")
@@ -571,7 +571,7 @@ def page_app():
             st.success(st.session_state.last_sortie_msg)
             st.session_state.last_sortie_msg = ""
 
-        if st.button("✅ Valider la Sortie", type="primary"):
+        if st.button("✅ Valider la Sortie", type="primary", key="btn_valider_sortie"):
             # Relire le stock frais depuis la session au moment du clic
             df_live = st.session_state.stock_df.copy()
             df_live_ids = df_live["ID_QR"].astype(str).str.strip()
@@ -609,10 +609,6 @@ def page_app():
 # ROUTAGE PRINCIPAL
 # ─────────────────────────────────────────────
 
-if not st.session_state.logged_in and not st.session_state.guest_mode:
-    page_accueil()
-else:
-    page_app()
 if not st.session_state.logged_in and not st.session_state.guest_mode:
     page_accueil()
 else:
