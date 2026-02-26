@@ -253,7 +253,7 @@ def page_accueil():
                 st.error("❌ Identifiant inconnu ou non autorisé.")
 
         st.markdown("---")
-        st.caption("Projet PFE - UIR Génie Mécanique | Maintenance 4.0")
+        st.caption("Projet PFE - EMI Génie Mécanique | Maintenance 4.0")
 
 
 # ─────────────────────────────────────────────
